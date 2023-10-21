@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="flipkart.utils.javatuples" type="repository">
+    <properties maven-id="com.flipkart.utils:javatuples:3.0" />
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/flipkart/utils/javatuples/3.0/javatuples-3.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
