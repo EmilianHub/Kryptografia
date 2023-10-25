@@ -1,6 +1,12 @@
+import java.util.Scanner;
+
 public class Main {
     public static void main(String[] args) {
-        TransPol transPol = new TransPol("Makumba");
+        System.out.print("Podaj tekst do zaszyforwania: ");
+        Scanner input = new Scanner(System.in);
+        String message = input.nextLine();
+
+        TransPol transPol = new TransPol(message);
         String s = transPol.readEncryptedMessage();
         System.out.println(s);
     }

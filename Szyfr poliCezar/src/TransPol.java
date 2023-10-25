@@ -43,20 +43,16 @@ public class TransPol {
     }
 
     public void generateKey() {
-        int width;
-        int height;
-        int upperBound = Math.max(roundUp(password.length(), 2), 5);
+        int upperBound = Math.max(roundUp(password.length(), 4), 5);
         int lowerBound = upperBound - 1;
         String method = encryptingMethod.get(random.nextInt(3));
 
         int length = generateLength(lowerBound, upperBound);
-        width = length;
-        height = length;
-
-        Pair<Integer, Integer> size = new Pair<>(height, width);
-        Pair<Integer, Integer> startPoint = findStartPoint(method, height, width);
+        ///Miało być jeszcze losowanie figury (kwadrat/prostokąt) ale zabrakło czasu
+        Pair<Integer, Integer> size = new Pair<>(length, length);
+        Pair<Integer, Integer> startPoint = findStartPoint(method, length, length);
         key = new Triplet<>(size, method, startPoint);
-        String keyAsString = String.format("%s;%s;%s;%s;%s", height, width, method, startPoint.getValue0(), startPoint.getValue1());
+        String keyAsString = String.format("%s;%s;%s;%s;%s", length, length, method, startPoint.getValue0(), startPoint.getValue1());
         saveKeyToFile(keyAsString);
     }
 
@@ -82,9 +78,7 @@ public class TransPol {
     private void saveKeyToFile(String key) {
         try {
             File file = new File("key");
-            if (!file.exists()) {
-                file.createNewFile();
-            }
+            if (!file.exists()) file.createNewFile();
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file));
             bufferedWriter.write(key);
             bufferedWriter.close();
@@ -197,9 +191,9 @@ public class TransPol {
     }
 
     private void toSquare(Character[][] shape) {
-        for (int height = 0; height < shape.length; height++) {
-            for (int width = 0; width < shape[1].length; width++) {
-                shape[width][height] = passwordAsCharArray[p];
+        for (int width = 0; width < shape[1].length; width++) {
+            for (int height = 0; height < shape.length; height++) {
+                shape[height][width] = passwordAsCharArray[p];
                 if (isOutOfBound()) {
                     return;
                 }
@@ -218,31 +212,36 @@ public class TransPol {
             }
             i++;
         }
+        if (p != passwordAsCharArray.length) {
+            for (int height = 1; height < shape.length -1; height++) {
+                for (int width = 0; width < i-1; width++) {
+                    shape[height + width][width] = passwordAsCharArray[p];
+                    if (isOutOfBound()) {
+                        return;
+                    }
+                }
+                i--;
+            }
+        }
     }
 
     private List<String> findRoute(Pair<Integer, Integer> size, Pair<Integer, Integer> startPoint) {
         List<String> order = new ArrayList<>();
         if (size.getValue0() - startPoint.getValue0() >= startPoint.getValue0()) {
             order.add("r");
-        } else {
-            order.add("l");
-        }
-        if (size.getValue1() - startPoint.getValue1() >= startPoint.getValue1()) {
-            order.add("d");
-        } else {
-            order.add("g");
-        }
-
-        if (order.get(0).equalsIgnoreCase("r")) {
             order.add("l");
         } else {
+            order.add("l");
             order.add("r");
         }
-        if (order.get(1).equalsIgnoreCase("d")) {
+        if (size.getValue1() - startPoint.getValue1() >= startPoint.getValue1()) {
+            order.add(1, "d");
             order.add("g");
         } else {
+            order.add(1, "g");
             order.add("d");
         }
+
         return order;
     }
 
@@ -319,13 +318,29 @@ public class TransPol {
             case "diagonal":
                 return decodeDiagonal(readKey, strings);
             case "square":
+                return decodeSquare(readKey, strings);
         }
         return "";
+    }
+
+    private String decodeSquare(Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey, String[] strings) {
+        Pair<Integer, Integer> size = readKey.getValue0();
+        StringBuilder decodedTextBuilder = new StringBuilder();
+
+        for (int width = 0; width < size.getValue1(); width++) {
+            for (int height = 0; height < size.getValue0(); height++) {
+                char[] charArray = strings[height].toCharArray();
+                char c = charArray[width];
+                isNotStopCharacter(c, decodedTextBuilder);
+            }
+        }
+        return decodedTextBuilder.toString();
     }
 
     private String decodeDiagonal(Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey, String[] strings) {
         Pair<Integer, Integer> size = readKey.getValue0();
         StringBuilder decodedTextBuilder = new StringBuilder();
+        countLetters(strings);
 
         for (int width = size.getValue1() - 1; width >= 0; width--) {
             for (int height = 0; height <= i; height++) {
@@ -334,6 +349,16 @@ public class TransPol {
                 isNotStopCharacter(c, decodedTextBuilder);
             }
             i++;
+        }
+        if (decodedLetters != foundLetters) {
+            for (int height = 1; height < size.getValue0() -1; height++) {
+                for (int width = 0; width < i-1; width++) {
+                    char[] charArray = strings[width + height].toCharArray();
+                    char c = charArray[width];
+                    isNotStopCharacter(c, decodedTextBuilder);
+                }
+                i--;
+            }
         }
         return decodedTextBuilder.toString();
     }
@@ -346,17 +371,19 @@ public class TransPol {
         p = 0;
         repeat = 1;
         decodedLetters = 1;
-        foundLetters = 0;
+        boolean encrypted = false;
         List<String> route = findRoute(size, startPoints);
+        countLetters(strings);
         StringBuilder decodedTextBuilder = new StringBuilder();
+
         char[] charArray = strings[heightPoint].toCharArray();
         char c = charArray[widthPoint];
         decodedTextBuilder.append(c);
-        countLetters(strings);
 
-        while (foundLetters != decodedLetters) {
+        while (!encrypted) {
             for (String s : route) {
-                nextMove(strings, s, i++, decodedTextBuilder);
+                encrypted = nextMove(strings, s, i++, decodedTextBuilder);
+                if (encrypted) break;
             }
         }
         return decodedTextBuilder.toString();
@@ -384,7 +411,7 @@ public class TransPol {
                     char character = row[widthPoint];
                     isNotStopCharacter(character, decodedTextBuilder);
                     if (decodedLetters == foundLetters) {
-                        break;
+                        return true;
                     }
                     p++;
                 }
@@ -396,7 +423,7 @@ public class TransPol {
                     char character = row[widthPoint];
                     isNotStopCharacter(character, decodedTextBuilder);
                     if (decodedLetters == foundLetters) {
-                        break;
+                        return true;
                     }
                     p++;
                 }
@@ -408,7 +435,7 @@ public class TransPol {
                     char character = row[widthPoint];
                     isNotStopCharacter(character, decodedTextBuilder);
                     if (decodedLetters == foundLetters) {
-                        break;
+                        return true;
                     }
                     p++;
                 }
@@ -420,7 +447,7 @@ public class TransPol {
                     char character = row[widthPoint];
                     isNotStopCharacter(character, decodedTextBuilder);
                     if (decodedLetters == foundLetters) {
-                        break;
+                        return true;
                     }
                     p++;
                 }
@@ -431,8 +458,8 @@ public class TransPol {
 
     private void isNotStopCharacter(char character, StringBuilder decodedTextBuilder) {
         if ('-' != character) {
-            decodedLetters++;
             decodedTextBuilder.append(character);
+            decodedLetters++;
         }
     }
 }
