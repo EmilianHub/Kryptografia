@@ -4,14 +4,10 @@ import org.javatuples.Triplet;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class TransPol {
 
-    private static final List<String> geometry = List.of("square", "rectangle");
     private static final List<String> encryptingMethod = List.of("spiral", "diagonal", "square");
     private static final Random random = new Random();
     private final String password;
@@ -22,6 +18,8 @@ public class TransPol {
     int p;
     int widthPoint;
     int heightPoint;
+    int decodedLetters;
+    int foundLetters;
 
     TransPol(String password) {
         if (!password.isBlank()) {
@@ -49,34 +47,23 @@ public class TransPol {
         int height;
         int upperBound = Math.max(roundUp(password.length(), 2), 5);
         int lowerBound = upperBound - 1;
-        String shape = geometry.get(random.nextInt(2));
         String method = encryptingMethod.get(random.nextInt(3));
 
-        switch (shape) {
-            case "square":
-                int length = generateLength(lowerBound, upperBound);
-                width = length;
-                height = length;
-                break;
-            case "rectangle":
-                width = generateLength(lowerBound, upperBound);
-                height = generateLength(lowerBound, upperBound);
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + shape);
-        }
+        int length = generateLength(lowerBound, upperBound);
+        width = length;
+        height = length;
 
         Pair<Integer, Integer> size = new Pair<>(height, width);
         Pair<Integer, Integer> startPoint = findStartPoint(method, height, width);
         key = new Triplet<>(size, method, startPoint);
-        String keyAsString = String.format("%s;%s;%s;%s;%s",height, width, method, startPoint.getValue0(), startPoint.getValue1());
+        String keyAsString = String.format("%s;%s;%s;%s;%s", height, width, method, startPoint.getValue0(), startPoint.getValue1());
         saveKeyToFile(keyAsString);
     }
 
     private Pair<Integer, Integer> findStartPoint(String method, int height, int width) {
         if ("spiral".equalsIgnoreCase(method)) {
-            widthPoint = Math.floorDiv(width-1, 2);
-            heightPoint = Math.floorDiv(height-1, 2);
+            widthPoint = Math.floorDiv(width - 1, 2);
+            heightPoint = Math.floorDiv(height - 1, 2);
         } else {
             widthPoint = width;
             heightPoint = 0;
@@ -144,7 +131,7 @@ public class TransPol {
     }
 
     private boolean nextMove(Character[][] shape, String route, Integer i) {
-        if (i != 0 && Math.floorMod(i, 2)==0) {
+        if (i != 0 && Math.floorMod(i, 2) == 0) {
             repeat++;
         }
         switch (route) {
@@ -153,7 +140,7 @@ public class TransPol {
                     if (isOutOfBound()) {
                         return true;
                     }
-                    widthPoint = Math.min(widthPoint + 1, shape[1].length -1);
+                    widthPoint = Math.min(widthPoint + 1, shape[1].length - 1);
                     shape[heightPoint][widthPoint] = passwordAsCharArray[p];
                 }
                 break;
@@ -171,7 +158,7 @@ public class TransPol {
                     if (isOutOfBound()) {
                         return true;
                     }
-                    heightPoint = Math.min(heightPoint + 1, shape.length -1);
+                    heightPoint = Math.min(heightPoint + 1, shape.length - 1);
                     shape[heightPoint][widthPoint] = passwordAsCharArray[p];
                 }
                 break;
@@ -210,8 +197,8 @@ public class TransPol {
     }
 
     private void toSquare(Character[][] shape) {
-        for (int height = 0; height < shape.length; height ++) {
-            for (int width = 0; width < shape[1].length; width ++) {
+        for (int height = 0; height < shape.length; height++) {
+            for (int width = 0; width < shape[1].length; width++) {
                 shape[width][height] = passwordAsCharArray[p];
                 if (isOutOfBound()) {
                     return;
@@ -222,8 +209,8 @@ public class TransPol {
 
 
     private void toDiagonal(Character[][] shape) {
-        for (int width = shape[1].length -1; width >= 0; width --) {
-            for (int height = 0; height <= i; height ++) {
+        for (int width = shape[1].length - 1; width >= 0; width--) {
+            for (int height = 0; height <= i; height++) {
                 shape[height][width + height] = passwordAsCharArray[p];
                 if (isOutOfBound()) {
                     return;
@@ -277,6 +264,175 @@ public class TransPol {
             bufferedWriter.close();
         } catch (Exception e) {
             System.out.println(e.getMessage());
+        }
+    }
+
+    private Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey() {
+        try {
+            File file = new File("key");
+            if (file.exists()) {
+                Scanner myReader = new Scanner(file);
+                if (myReader.hasNextLine()) {
+                    String data = myReader.nextLine();
+                    String[] split = data.split(";");
+                    return createReadKey(split);
+                }
+                myReader.close();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Couldn't read key");
+        }
+        return null;
+    }
+
+    private Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> createReadKey(String[] split) {
+        Pair<Integer, Integer> size = new Pair<>(Integer.valueOf(split[0]), Integer.valueOf(split[1]));
+        String method = split[2];
+        Pair<Integer, Integer> startPoints = new Pair<>(Integer.valueOf(split[3]), Integer.valueOf(split[4]));
+        return new Triplet<>(size, method, startPoints);
+    }
+
+    public String readEncryptedMessage() {
+        try {
+            File file = new File("message");
+            if (file.exists()) {
+                Scanner myReader = new Scanner(file);
+                if (myReader.hasNextLine()) {
+                    String data = myReader.nextLine();
+                    return decodeMessageBasedOnKey(data);
+                }
+                myReader.close();
+            }
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
+        return "";
+    }
+
+    private String decodeMessageBasedOnKey(String data) {
+        Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey = readKey();
+        String[] strings = data.split("\\$");
+        i = 0;
+        switch (readKey.getValue1()) {
+            case "spiral":
+                return decodeSpiral(readKey, strings);
+            case "diagonal":
+                return decodeDiagonal(readKey, strings);
+            case "square":
+        }
+        return "";
+    }
+
+    private String decodeDiagonal(Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey, String[] strings) {
+        Pair<Integer, Integer> size = readKey.getValue0();
+        StringBuilder decodedTextBuilder = new StringBuilder();
+
+        for (int width = size.getValue1() - 1; width >= 0; width--) {
+            for (int height = 0; height <= i; height++) {
+                char[] charArray = strings[height].toCharArray();
+                char c = charArray[width + height];
+                isNotStopCharacter(c, decodedTextBuilder);
+            }
+            i++;
+        }
+        return decodedTextBuilder.toString();
+    }
+
+    private String decodeSpiral(Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey, String[] strings) {
+        Pair<Integer, Integer> size = readKey.getValue0();
+        Pair<Integer, Integer> startPoints = readKey.getValue2();
+        widthPoint = startPoints.getValue1();
+        heightPoint = startPoints.getValue0();
+        p = 0;
+        repeat = 1;
+        decodedLetters = 1;
+        foundLetters = 0;
+        List<String> route = findRoute(size, startPoints);
+        StringBuilder decodedTextBuilder = new StringBuilder();
+        char[] charArray = strings[heightPoint].toCharArray();
+        char c = charArray[widthPoint];
+        decodedTextBuilder.append(c);
+        countLetters(strings);
+
+        while (foundLetters != decodedLetters) {
+            for (String s : route) {
+                nextMove(strings, s, i++, decodedTextBuilder);
+            }
+        }
+        return decodedTextBuilder.toString();
+    }
+
+    private void countLetters(String[] strings) {
+        int count = 0;
+        for (String string : strings) {
+            for (char letter : string.toCharArray()) {
+                if (letter != '-') count++;
+            }
+        }
+        foundLetters = count;
+    }
+
+    private boolean nextMove(String[] strings, String route, Integer i, StringBuilder decodedTextBuilder) {
+        if (i != 0 && Math.floorMod(i, 2) == 0) {
+            repeat++;
+        }
+        switch (route) {
+            case "r":
+                for (int l = 0; l < repeat; l++) {
+                    char[] row = strings[heightPoint].toCharArray();
+                    widthPoint = Math.min(widthPoint + 1, row.length - 1);
+                    char character = row[widthPoint];
+                    isNotStopCharacter(character, decodedTextBuilder);
+                    if (decodedLetters == foundLetters) {
+                        break;
+                    }
+                    p++;
+                }
+                break;
+            case "l":
+                for (int l = 0; l < repeat; l++) {
+                    char[] row = strings[heightPoint].toCharArray();
+                    widthPoint = Math.max(widthPoint - 1, 0);
+                    char character = row[widthPoint];
+                    isNotStopCharacter(character, decodedTextBuilder);
+                    if (decodedLetters == foundLetters) {
+                        break;
+                    }
+                    p++;
+                }
+                break;
+            case "d":
+                for (int l = 0; l < repeat; l++) {
+                    heightPoint = Math.min(heightPoint + 1, strings.length - 1);
+                    char[] row = strings[heightPoint].toCharArray();
+                    char character = row[widthPoint];
+                    isNotStopCharacter(character, decodedTextBuilder);
+                    if (decodedLetters == foundLetters) {
+                        break;
+                    }
+                    p++;
+                }
+                break;
+            case "g":
+                for (int l = 0; l < repeat; l++) {
+                    heightPoint = Math.max(heightPoint - 1, 0);
+                    char[] row = strings[heightPoint].toCharArray();
+                    char character = row[widthPoint];
+                    isNotStopCharacter(character, decodedTextBuilder);
+                    if (decodedLetters == foundLetters) {
+                        break;
+                    }
+                    p++;
+                }
+                break;
+        }
+        return false;
+    }
+
+    private void isNotStopCharacter(char character, StringBuilder decodedTextBuilder) {
+        if ('-' != character) {
+            decodedLetters++;
+            decodedTextBuilder.append(character);
         }
     }
 }
