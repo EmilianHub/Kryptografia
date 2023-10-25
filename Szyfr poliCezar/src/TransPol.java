@@ -42,10 +42,6 @@ public class TransPol {
         return key.getValue2();
     }
 
-    private int getSiftKey(Pair<Integer, Integer> key) {
-        return roundUp(key.getValue0() + key.getValue1(), 2);
-    }
-
     public void generateKey() {
         int upperBound = Math.max(roundUp(password.length(), 4), 5);
         int lowerBound = upperBound - 1;
@@ -91,28 +87,64 @@ public class TransPol {
         }
     }
 
-    private String shiftEncryption(String message, int key) {
-        StringBuilder encryptedMessage = new StringBuilder();
+    public static String shiftEncryption(String plaintext, String key) {
+        StringBuilder ciphertext = new StringBuilder();
+        int keyLength = key.length();
 
-        for (char character : message.toCharArray()) {
-            if (Character.isLetter(character)) {
-                char base = Character.isUpperCase(character) ? 'A' : 'a';
-                character = (char) (((character - base + key) % 26) + base);
+        for (int i = 0; i < plaintext.length(); i++) {
+            char plainChar = plaintext.charAt(i);
+
+            if (Character.isLetter(plainChar)) {
+                char keyChar = key.charAt(i % keyLength);
+                int shift = Character.toUpperCase(keyChar) - 'A';
+                char encryptedChar = encryptChar(plainChar, shift);
+                ciphertext.append(encryptedChar);
+            } else {
+                ciphertext.append(plainChar);
             }
-
-            encryptedMessage.append(character);
         }
 
-        return encryptedMessage.toString();
+        return ciphertext.toString();
     }
 
-    public String shiftDecryption(String text, Pair<Integer, Integer> readKey) {
-        int key = (26 - getSiftKey(readKey)) % 26;
-        return shiftEncryption(text, key);
+    public static String shiftDecryption(String ciphertext, String key) {
+        StringBuilder plaintext = new StringBuilder();
+        int keyLength = key.length();
+
+        for (int i = 0; i < ciphertext.length(); i++) {
+            char cipherChar = ciphertext.charAt(i);
+
+            if (Character.isLetter(cipherChar)) {
+                char keyChar = key.charAt(i % keyLength);
+                int shift = Character.toUpperCase(keyChar) - 'A';
+                char decryptedChar = decryptChar(cipherChar, shift);
+                plaintext.append(decryptedChar);
+            } else {
+                plaintext.append(cipherChar);
+            }
+        }
+
+        return plaintext.toString();
+    }
+
+    public static char encryptChar(char c, int shift) {
+        if (Character.isUpperCase(c)) {
+            return (char) ((c - 'A' + shift) % 26 + 'A');
+        } else {
+            return (char) ((c - 'a' + shift) % 26 + 'a');
+        }
+    }
+
+    public static char decryptChar(char c, int shift) {
+        if (Character.isUpperCase(c)) {
+            return (char) ((c - 'A' - shift + 26) % 26 + 'A');
+        } else {
+            return (char) ((c - 'a' - shift + 26) % 26 + 'a');
+        }
     }
 
     public void encrypt() {
-        passwordAsCharArray = shiftEncryption(password, getSiftKey(key.getValue2())).toCharArray();
+        passwordAsCharArray = shiftEncryption(password, key.getValue1()).toCharArray();
         Character[][] encrypt = new Character[0][0];
 
         switch (key.getValue1()) {
@@ -348,7 +380,7 @@ public class TransPol {
                 decryptedMessage = decodeSquare(readKey, strings);
                 break;
         }
-        return shiftDecryption(decryptedMessage, readKey.getValue2());
+        return shiftDecryption(decryptedMessage, readKey.getValue1());
     }
 
     private String decodeSquare(Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey, String[] strings) {
