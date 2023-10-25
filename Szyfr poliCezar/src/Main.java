@@ -7,7 +7,7 @@ public class Main {
         String message = input.nextLine();
 
         TransPol transPol = new TransPol(message);
-        String s = transPol.readEncryptedMessage();
+        String s = transPol.decrypt();
         System.out.println(s);
     }
 }

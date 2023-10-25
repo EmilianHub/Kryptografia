@@ -42,6 +42,10 @@ public class TransPol {
         return key.getValue2();
     }
 
+    private int getSiftKey(Pair<Integer, Integer> key) {
+        return roundUp(key.getValue0() + key.getValue1(), 2);
+    }
+
     public void generateKey() {
         int upperBound = Math.max(roundUp(password.length(), 4), 5);
         int lowerBound = upperBound - 1;
@@ -87,8 +91,28 @@ public class TransPol {
         }
     }
 
+    private String shiftEncryption(String message, int key) {
+        StringBuilder encryptedMessage = new StringBuilder();
+
+        for (char character : message.toCharArray()) {
+            if (Character.isLetter(character)) {
+                char base = Character.isUpperCase(character) ? 'A' : 'a';
+                character = (char) (((character - base + key) % 26) + base);
+            }
+
+            encryptedMessage.append(character);
+        }
+
+        return encryptedMessage.toString();
+    }
+
+    public String shiftDecryption(String text, Pair<Integer, Integer> readKey) {
+        int key = (26 - getSiftKey(readKey)) % 26;
+        return shiftEncryption(text, key);
+    }
+
     public void encrypt() {
-        passwordAsCharArray = password.toCharArray();
+        passwordAsCharArray = shiftEncryption(password, getSiftKey(key.getValue2())).toCharArray();
         Character[][] encrypt = new Character[0][0];
 
         switch (key.getValue1()) {
@@ -291,7 +315,7 @@ public class TransPol {
         return new Triplet<>(size, method, startPoints);
     }
 
-    public String readEncryptedMessage() {
+    public String decrypt() {
         try {
             File file = new File("message");
             if (file.exists()) {
@@ -312,15 +336,19 @@ public class TransPol {
         Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey = readKey();
         String[] strings = data.split("\\$");
         i = 0;
+        String decryptedMessage = "";
         switch (readKey.getValue1()) {
             case "spiral":
-                return decodeSpiral(readKey, strings);
+                decryptedMessage = decodeSpiral(readKey, strings);
+                break;
             case "diagonal":
-                return decodeDiagonal(readKey, strings);
+                decryptedMessage = decodeDiagonal(readKey, strings);
+                break;
             case "square":
-                return decodeSquare(readKey, strings);
+                decryptedMessage = decodeSquare(readKey, strings);
+                break;
         }
-        return "";
+        return shiftDecryption(decryptedMessage, readKey.getValue2());
     }
 
     private String decodeSquare(Triplet<Pair<Integer, Integer>, String, Pair<Integer, Integer>> readKey, String[] strings) {
